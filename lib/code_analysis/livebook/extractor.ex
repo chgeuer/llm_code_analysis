@@ -4,6 +4,9 @@ defmodule CodeAnalysis.Livebook.Extractor do
 
   Filters out non-executable code blocks marked with `force_markdown`.
   Provides AST-based analysis of aliases and function calls.
+
+  Note: The `extract_executable_code/1` function now delegates to the 
+  `NimbleLivebookMarkdownExtractor` library for robust parsing.
   """
 
   @doc """
@@ -15,72 +18,35 @@ defmodule CodeAnalysis.Livebook.Extractor do
 
   Returns a string containing only executable Elixir code.
 
+  This function now uses the NimbleParsec-based `NimbleLivebookMarkdownExtractor`
+  library for more robust and reliable parsing.
+
   ## Examples
 
-      iex> content = ~s(
+      iex> content = \"\"\"
       ...> # My Notebook
       ...>
-      ...> ```elixir
-      ...> IO.puts("real code")
-      ...> ```
+      ...> \\`\\`\\`elixir
+      ...> a = 1
+      ...> \\`\\`\\`
       ...>
       ...> <!-- livebook:{"force_markdown":true} -->
       ...>
-      ...> ```elixir
-      ...> FakeModule.bad()
-      ...> ```
-      ...> )
+      ...> \\`\\`\\`elixir
+      ...> b = 2
+      ...> \\`\\`\\`
+      ...>
+      ...> \\`\\`\\`elixir
+      ...> c = 3
+      ...> \\`\\`\\`
+      ...> \"\"\"
       iex> CodeAnalysis.Livebook.Extractor.extract_executable_code(content)
-      "IO.puts(\\"real code\\")"
+      "a = 1\\n\\nc = 3"
 
   """
   @spec extract_executable_code(String.t()) :: String.t()
   def extract_executable_code(content) do
-    lines = String.split(content, "\n")
-
-    {executable_blocks, _state} =
-      Enum.reduce(lines, {[], :outside_block}, fn line, {blocks, state} ->
-        case state do
-          :outside_block ->
-            cond do
-              String.contains?(line, ~s(<!-- livebook:{"force_markdown":true})) ->
-                {blocks, :in_force_markdown}
-
-              String.match?(line, ~r/^```elixir\s*$/) ->
-                {blocks, :in_executable_block}
-
-              true ->
-                {blocks, :outside_block}
-            end
-
-          :in_force_markdown ->
-            if String.match?(line, ~r/^```elixir\s*$/) do
-              {blocks, :in_non_executable_block}
-            else
-              {blocks, :in_force_markdown}
-            end
-
-          :in_non_executable_block ->
-            if String.match?(line, ~r/^```\s*$/) do
-              {blocks, :outside_block}
-            else
-              {blocks, :in_non_executable_block}
-            end
-
-          :in_executable_block ->
-            if String.match?(line, ~r/^```\s*$/) do
-              # Add a blank line between code blocks for separation
-              {["" | blocks], :outside_block}
-            else
-              {[line | blocks], :in_executable_block}
-            end
-        end
-      end)
-
-    executable_blocks
-    |> Enum.reverse()
-    |> Enum.join("\n")
-    |> String.trim()
+    NimbleLivebookMarkdownExtractor.extract_executable_code(content)
   end
 
   @doc """

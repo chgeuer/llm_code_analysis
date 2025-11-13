@@ -23,7 +23,8 @@ defmodule LlmCodeAnalysis.MixProject do
     [
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.39.1", only: [:dev], runtime: false},
-      {:nimble_options, "~> 1.0"}
+      {:nimble_options, "~> 1.0"},
+      {:nimble_livebook_markdown_extractor, github: "chgeuer/nimble_livebook_markdown_extractor"}
     ]
   end
 end
