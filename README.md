@@ -76,6 +76,55 @@ INVALID API CALLS FOUND
       - Another.Bad.call
 ```
 
+A more complex (real-world) example would be
+
+```text
+Compiling 16 files (.ex)
+Generated azure_amqp app
+# Validating API calls (checking actual function existence)...
+================================================================================
+VALIDATION SUMMARY
+================================================================================
+
+Total files:   122
+Valid files:   78 (63.9%)
+Invalid files: 44 (36.1%)
+
+================================================================================
+INVALID API CALLS FOUND
+================================================================================
+
+📄 content/05_advanced_patterns.livemd
+   ❌ Invalid calls:
+      - MyEventProcessor.start_link
+      - ResilientSend.send_with_retry
+
+📄 content/azure_certificates.livemd
+   ❌ Invalid calls:
+      - MicrosoftCerts.CompileHelpers.download_certs_for_pinning
+
+...
+
+📄 test/integration/service_bus/sync_api_test.exs
+   ❌ Invalid calls:
+      - IntegrationConfig.fetch_jwt_token (→ Azure.Amqp.Test.IntegrationConfig.fetch_jwt_token)
+      - IntegrationConfig.jwt_config! (→ Azure.Amqp.Test.IntegrationConfig.jwt_config!)
+
+📄 test/integration/service_bus/topics_test.exs
+   ❌ Invalid calls:
+      - IntegrationConfig.sas_config! (→ Azure.Amqp.Test.IntegrationConfig.sas_config!)
+
+📄 test/integration/stream_receiver_integration_test.exs
+   ❌ Invalid calls:
+      - Azure.Amqp.Test.IntegrationConfig.eventhub_config!
+      - Azure.Amqp.Test.IntegrationConfig.fetch_eventhub_jwt_token
+      - ConnectionHolder.get_connection (→ Azure.Amqp.Test.ConnectionHolder.get_connection)
+      - IntegrationConfig.sas_config! (→ Azure.Amqp.Test.IntegrationConfig.sas_config!)
+      - QueueFlusher.flush_queue (→ Azure.Amqp.Test.QueueFlusher.flush_queue)
+      - TelemetryHelper.attach_minimal_handler (→ Azure.Amqp.Test.TelemetryHelper.attach_minimal_handler)
+      - TelemetryHelper.detach_all (→ Azure.Amqp.Test.TelemetryHelper.detach_all)
+```
+
 **Perfect for:**
 - Pre-commit hooks to catch API errors
 - CI/CD validation of code quality
