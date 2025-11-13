@@ -152,6 +152,7 @@ mix api.reference
 - Outputs to configurable file (default: `docs/api-reference.md`)
 
 **Configuration in `mix.exs`:**
+
 ```elixir
 def project do
   [
@@ -172,6 +173,104 @@ end
 - Keeping API docs synchronized with code
 - Creating reference material for development teams
 - Automated documentation in CI/CD
+
+#### Sample output from `mix api.reference`
+
+```markdown
+# Azure Amqp - API Reference
+
+Concise reference of all public modules and functions.
+
+---
+
+## Mix Tasks
+
+### [`Mix.Tasks.Azure.Amqp.FlushQueue`](../lib/mix/tasks/azure/amqp/flush_queue.ex)
+
+Flush all messages from an Azure Service Bus queue and its dead-letter queue.
+
+
+- `Mix.Tasks.Azure.Amqp.FlushQueue.run/1`
+
+
+## Authentication
+
+### [`Azure.Amqp.Auth.CBS.Client`](../lib/azure/amqp/auth/cbs/client.ex)
+
+Claims-Based Security (CBS) client for Azure AMQP authentication.
+
+
+- `Azure.Amqp.Auth.CBS.Client.__struct__/0`
+- `Azure.Amqp.Auth.CBS.Client.__struct__/1`
+- `Azure.Amqp.Auth.CBS.Client.child_spec/1` - Returns a specification to start this module under a supervisor.
+- `Azure.Amqp.Auth.CBS.Client.close/1` - Closes the CBS client and its links.
+- `Azure.Amqp.Auth.CBS.Client.code_change/3`
+- `Azure.Amqp.Auth.CBS.Client.handle_call/3`
+- `Azure.Amqp.Auth.CBS.Client.handle_cast/2`
+- `Azure.Amqp.Auth.CBS.Client.handle_continue/2`
+- `Azure.Amqp.Auth.CBS.Client.handle_info/2`
+- `Azure.Amqp.Auth.CBS.Client.init/1`
+- `Azure.Amqp.Auth.CBS.Client.put_token/2` - Sends a security token for a resource to enable access.
+- `Azure.Amqp.Auth.CBS.Client.start_link/1` - Starts a CBS client linked to a connection.
+- `Azure.Amqp.Auth.CBS.Client.terminate/2`
+- `Azure.Amqp.Auth.CBS.Client.terminate/3`
+- `Azure.Amqp.Auth.CBS.Client.validate_datetime/1`
+
+
+### [`Azure.Amqp.Auth.CBS.SasToken`](../lib/azure/amqp/auth/cbs/sas_token.ex)
+
+Shared Access Signature (SAS) token generation for Azure Service Bus and Event Hubs.
+
+
+- `Azure.Amqp.Auth.CBS.SasToken.from_connection_string/1`
+- `Azure.Amqp.Auth.CBS.SasToken.from_connection_string/2` - Convenience function to generate a SAS token from a connection string.
+- `Azure.Amqp.Auth.CBS.SasToken.generate/1` - Generates a SAS token for a resource.
+- `Azure.Amqp.Auth.CBS.SasToken.parse_connection_string/1` - Parses an Azure Service Bus connection string.
+
+...
+
+## AMQP Types
+
+### [`Azure.Amqp.Protocol.Types.Outcomes`](../lib/azure/amqp/protocol/types/outcomes.ex)
+
+AMQP 1.0 delivery outcomes for message settlement.
+
+
+- `Azure.Amqp.Protocol.Types.Outcomes.accepted/0` - Creates an Accepted outcome.
+- `Azure.Amqp.Protocol.Types.Outcomes.decode/1` - Decodes an outcome from an AMQP described type.
+- `Azure.Amqp.Protocol.Types.Outcomes.encode/1` - Encodes an outcome as AMQP binary data.
+- `Azure.Amqp.Protocol.Types.Outcomes.modified/0`
+- `Azure.Amqp.Protocol.Types.Outcomes.modified/1` - Creates a Modified outcome.
+- `Azure.Amqp.Protocol.Types.Outcomes.received/2` - Creates a Received outcome (not terminal).
+- `Azure.Amqp.Protocol.Types.Outcomes.rejected/0`
+- `Azure.Amqp.Protocol.Types.Outcomes.rejected/1`
+- `Azure.Amqp.Protocol.Types.Outcomes.rejected/2`
+- `Azure.Amqp.Protocol.Types.Outcomes.rejected/3` - Creates a Rejected outcome with optional error information.
+- `Azure.Amqp.Protocol.Types.Outcomes.released/0` - Creates a Released outcome.
+
+## Internal
+
+### [`Azure.Amqp.Application`](../lib/azure/amqp/application.ex)
+
+OTP Application for Azure.Amqp.
+
+
+- `Azure.Amqp.Application.start/2`
+- `Azure.Amqp.Application.stop/1`
+
+---
+
+## How This Was Generated
+
+This document was generated using CodeAnalysis.API.ReferenceGenerator:
+
+1. Extract API structure using CodeAnalysis.API.Introspection
+2. `:application.get_key/2` - List all application modules
+3. `Module.__info__(:functions)` - Get exported functions for each module
+4. `Code.fetch_docs/1` - Extract @doc documentation
+5. Pattern matching on module names for categorization
+```
+
 
 ### 4. `mix docs.show_groups` - Show Module Organization
 
