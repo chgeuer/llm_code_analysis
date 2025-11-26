@@ -143,6 +143,62 @@ defmodule CodeAnalysis.API.Validator do
     namespace
   end
 
+  defp extract_defined_modules(ast) do
+    # Use a recursive approach to track module nesting properly
+    collect_modules(ast, [])
+    |> MapSet.new()
+  end
+
+  # Recursively collect all defined modules with proper nesting
+  defp collect_modules(ast, parent_modules) do
+    case ast do
+      {:defmodule, _, [{:__aliases__, _, module_parts}, [do: body]]} ->
+        # Current module name
+        current_module = Enum.join(module_parts, ".")
+        
+        # Full qualified name
+        full_module_name =
+          if Enum.empty?(parent_modules) do
+            current_module
+          else
+            Enum.join(parent_modules ++ [current_module], ".")
+          end
+        
+        # Recursively collect from body with updated parent stack
+        nested_modules = collect_modules(body, parent_modules ++ [current_module])
+        
+        # Include this module and all nested ones
+        [full_module_name | nested_modules]
+
+      {:__block__, _, statements} when is_list(statements) ->
+        # Process each statement in a block
+        Enum.flat_map(statements, &collect_modules(&1, parent_modules))
+
+      {_form, _, args} when is_list(args) ->
+        # Recursively search in any other form
+        Enum.flat_map(args, &collect_modules(&1, parent_modules))
+
+      _ ->
+        # Base case: not a form we care about
+        []
+    end
+  end
+
+  defp module_defined_in_file?(module_name, defined_modules) do
+    # Check if the module is defined directly
+    if MapSet.member?(defined_modules, module_name) do
+      true
+    else
+      # Also check if this is a short reference to a nested module
+      # e.g., "TestConsumer" might be "ParentModule.TestConsumer"
+      short_name = module_name |> String.split(".") |> List.last()
+      
+      Enum.any?(defined_modules, fn defined_module ->
+        defined_module == module_name || String.ends_with?(defined_module, ".#{short_name}")
+      end)
+    end
+  end
+
   defp merge_implicit_aliases(explicit_aliases, nil), do: explicit_aliases
 
   defp merge_implicit_aliases(explicit_aliases, namespace) do
@@ -191,6 +247,9 @@ defmodule CodeAnalysis.API.Validator do
     # Extract module namespace from defmodule
     module_namespace = extract_module_namespace(ast)
 
+    # Extract all modules defined in this file
+    defined_modules = extract_defined_modules(ast)
+
     # Extract aliases from AST
     explicit_aliases = Extractor.extract_aliases(ast)
 
@@ -209,7 +268,10 @@ defmodule CodeAnalysis.API.Validator do
           # Check if function exists with ANY arity (not strict arity check)
           # because pipe operators and default parameters make arity complex
           resolved_module = Extractor.resolve_alias(module, aliases)
-          valid_call?(resolved_module, function, allowed_modules)
+          
+          # Skip validation if the module is defined in this same file
+          module_defined_in_file?(resolved_module, defined_modules) ||
+            valid_call?(resolved_module, function, allowed_modules)
       end)
       |> Enum.map(fn
         {module, function, arity} when is_integer(arity) ->
@@ -346,11 +408,29 @@ defmodule CodeAnalysis.API.Validator do
 
     case Code.ensure_loaded(module) do
       {:module, ^module} ->
-        exports = module.__info__(:functions)
-
-        Enum.any?(exports, fn {name, _arity} ->
-          Atom.to_string(name) == function_name
-        end)
+        # Check if it's a protocol - protocols have __protocol__/1 function
+        is_protocol = function_exported?(module, :__protocol__, 1)
+        
+        if is_protocol do
+          # For protocols, accept special functions like impl_for/1, impl_for!/1, etc.
+          protocol_functions = ~w[impl_for impl_for!]
+          
+          if function_name in protocol_functions do
+            true
+          else
+            # Check regular exports
+            exports = module.__info__(:functions)
+            Enum.any?(exports, fn {name, _arity} ->
+              Atom.to_string(name) == function_name
+            end)
+          end
+        else
+          # Regular module - check exports
+          exports = module.__info__(:functions)
+          Enum.any?(exports, fn {name, _arity} ->
+            Atom.to_string(name) == function_name
+          end)
+        end
 
       {:error, _} ->
         false
