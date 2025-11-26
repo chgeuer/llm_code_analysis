@@ -151,7 +151,7 @@ defmodule CodeAnalysis.API.ReferenceGenerator do
     1. Extract API structure using CodeAnalysis.API.Introspection
     2. `:application.get_key/2` - List all application modules
     3. `Module.__info__(:functions)` - Get exported functions for each module
-    4. `Code.fetch_docs/1` - Extract @doc documentation
+    4. `Code.fetch_docs/1` - Extract @doc documentation and function signatures with parameter names
     5. Pattern matching on module names for categorization
 
     """

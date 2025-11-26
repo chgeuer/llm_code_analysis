@@ -160,26 +160,43 @@ defmodule CodeAnalysis.API.Validator do
     invalid_calls =
       calls
       |> MapSet.to_list()
-      |> Enum.reject(fn {module, function} ->
-        resolved_module = Extractor.resolve_alias(module, aliases)
-        valid_call?(resolved_module, function, allowed_modules)
+      |> Enum.reject(fn
+        {module, function, _arity} ->
+          # Check if function exists with ANY arity (not strict arity check)
+          # because pipe operators and default parameters make arity complex
+          resolved_module = Extractor.resolve_alias(module, aliases)
+          valid_call?(resolved_module, function, allowed_modules)
       end)
-      |> Enum.map(fn {module, function} ->
-        resolved = Extractor.resolve_alias(module, aliases)
-        call = "#{module}.#{function}"
+      |> Enum.map(fn
+        {module, function, arity} when is_integer(arity) ->
+          resolved = Extractor.resolve_alias(module, aliases)
+          call = "#{module}.#{function}/#{arity}"
 
-        if module == resolved do
-          call
-        else
-          "#{call} (→ #{resolved}.#{function})"
-        end
+          if module == resolved do
+            call
+          else
+            "#{call} (→ #{resolved}.#{function}/#{arity})"
+          end
+
+        {module, function, nil} ->
+          resolved = Extractor.resolve_alias(module, aliases)
+          call = "#{module}.#{function}"
+
+          if module == resolved do
+            call
+          else
+            "#{call} (→ #{resolved}.#{function})"
+          end
       end)
       |> Enum.sort()
 
     all_calls =
       calls
       |> MapSet.to_list()
-      |> Enum.map(fn {mod, fun} -> "#{mod}.#{fun}" end)
+      |> Enum.map(fn
+        {mod, fun, arity} when is_integer(arity) -> "#{mod}.#{fun}/#{arity}"
+        {mod, fun, nil} -> "#{mod}.#{fun}"
+      end)
       |> Enum.sort()
 
     %{
@@ -279,6 +296,7 @@ defmodule CodeAnalysis.API.Validator do
     end
   end
 
+
   defp valid_call_string?(call, allowed_modules) do
     parts = String.split(call, ".")
     {module_parts, [function]} = Enum.split(parts, -1)
@@ -305,6 +323,7 @@ defmodule CodeAnalysis.API.Validator do
     ArgumentError ->
       false
   end
+
 
   defp allowed_module?(module, allowed_modules) do
     Enum.any?(allowed_modules, fn prefix ->

@@ -19,8 +19,8 @@ defmodule CodeAnalysis.API.Introspection do
         module_description: "Description from @moduledoc",
         file_path: "relative/path/to/file.ex",
         functions: %{
-          "function_name/arity" => "Function description from @doc",
-          "other_function/2" => nil  # Has @doc false or no @doc
+          "function_name(arg1, arg2)" => "Function description from @doc",
+          "other_function(param)" => nil  # Has @doc false or no @doc
         }
       }
     }
@@ -82,8 +82,8 @@ defmodule CodeAnalysis.API.Introspection do
       module_description: "Connection management",
       file_path: "lib/my_app/connection.ex",
       functions: %{
-        "start_link/1" => "Starts a connection",
-        "close/1" => nil
+        "start_link(opts)" => "Starts a connection",
+        "close(conn)" => nil
       }
     }
   }
@@ -104,7 +104,7 @@ defmodule CodeAnalysis.API.Introspection do
   @doc """
   Gets all function signatures and descriptions for a module.
 
-  Returns a map of `"function_name/arity" => "description"`.
+  Returns a map of `"function_name(args)" => "description"`.
   Functions with `@doc false` or no `@doc` have `nil` as description.
   """
   def get_module_functions(module, include_hidden \\ false) do
@@ -117,14 +117,11 @@ defmodule CodeAnalysis.API.Introspection do
     # Build map of function signatures to descriptions
     functions
     |> Enum.map(fn {name, arity} ->
-      signature = "#{name}/#{arity}"
+      # Find matching doc entry - could be exact match or a function with defaults
+      doc_entry = find_doc_entry(docs, name, arity)
 
-      # Find matching doc entry
-      doc_entry =
-        Enum.find(docs, fn
-          {{:function, ^name, ^arity}, _, _, _, _} -> true
-          _ -> false
-        end)
+      # Extract signature with parameter names from docs
+      signature = extract_signature(docs, name, arity)
 
       description =
         case doc_entry do
@@ -139,6 +136,10 @@ defmodule CodeAnalysis.API.Introspection do
 
           {{:function, _, _}, _, _, doc_content, _} when is_binary(doc_content) ->
             extract_first_sentence(doc_content)
+
+          nil ->
+            # No doc entry - check if hidden by looking for a function with defaults
+            nil
 
           _ ->
             nil
@@ -194,6 +195,125 @@ defmodule CodeAnalysis.API.Introspection do
 
   # Private helpers
 
+  defp find_doc_entry(docs, name, arity) do
+    # First try exact match
+    case Enum.find(docs, fn
+           {{:function, ^name, ^arity}, _, _, _, _} -> true
+           _ -> false
+         end) do
+      nil ->
+        # If not found, look for a function with the same name and higher arity
+        # that has defaults which would generate this arity
+        Enum.find(docs, fn
+          {{:function, ^name, doc_arity}, _, _, _, %{defaults: defaults}}
+          when doc_arity > arity and doc_arity - defaults <= arity ->
+            true
+
+          _ ->
+            false
+        end)
+
+      entry ->
+        entry
+    end
+  end
+
+  defp extract_signature(docs, name, arity) do
+    doc_entry = find_doc_entry(docs, name, arity)
+
+    case doc_entry do
+      {{:function, ^name, doc_arity}, _, [signature_string], _, _metadata}
+      when doc_arity == arity ->
+        # Exact match - use the signature as-is
+        signature_string
+        |> String.trim()
+        |> extract_function_call()
+
+      {{:function, ^name, doc_arity}, _, [signature_string], _, %{defaults: _defaults}}
+      when doc_arity > arity ->
+        # Function has defaults - we need to truncate parameters
+        # Calculate how many parameters to show
+        params_to_show = arity
+        signature_string
+        |> String.trim()
+        |> extract_function_call_with_params(params_to_show)
+
+      _ ->
+        # Fallback to name/arity format if no signature available
+        "#{name}/#{arity}"
+    end
+  end
+
+  defp extract_function_call_with_params(signature_string, params_to_show) do
+    # Special case: struct literal %Module{} should become __struct__()
+    if String.starts_with?(signature_string, "%") do
+      "__struct__()"
+    else
+      case Regex.run(~r/([a-z_][a-zA-Z0-9_?!]*)\((.*?)\)(?:\s|$)/, signature_string) do
+        [_, function_name, args] ->
+          # Clean and limit the args
+          cleaned_args =
+            args
+            |> String.split(",")
+            |> Enum.map(&String.trim/1)
+            |> Enum.take(params_to_show)
+            |> Enum.map(fn arg ->
+              # Remove default values
+              arg
+              |> String.split("\\\\")
+              |> List.first()
+              |> String.trim()
+            end)
+            |> Enum.join(", ")
+
+          "#{function_name}(#{cleaned_args})"
+
+        _ ->
+          # If regex doesn't match, return as-is
+          signature_string
+      end
+    end
+  end
+
+  defp extract_function_call(signature_string) do
+    # The signature might be like "terminate(reason, state)" or "Module.terminate(reason, state)"
+    # We want to extract just the "function_name(args)" part
+    # Special case: struct literal like "%Module{}" should become "__struct__()"
+    cond do
+      # Match struct literal %Module{} or %Module{...}
+      String.starts_with?(signature_string, "%") ->
+        "__struct__()"
+
+      # Match regular function calls
+      true ->
+        case Regex.run(~r/([a-z_][a-zA-Z0-9_?!]*)\((.*?)\)(?:\s|$)/, signature_string) do
+          [_, function_name, args] ->
+            # Clean up the args - remove default values for display
+            cleaned_args = clean_args(args)
+            "#{function_name}(#{cleaned_args})"
+
+          _ ->
+            # If regex doesn't match, return as-is
+            signature_string
+        end
+    end
+  end
+
+  defp clean_args(args) do
+    # Remove default value expressions like " \\ to_timeout(second: 5)"
+    # but keep the parameter name
+    args
+    |> String.split(",")
+    |> Enum.map(fn arg ->
+      arg
+      |> String.trim()
+      |> String.split("\\\\")
+      |> List.first()
+      |> String.trim()
+    end)
+    |> Enum.join(", ")
+  end
+
   defp categorize_module(module, category_mappings) do
     module_name = inspect(module)
 
@@ -220,6 +340,7 @@ defmodule CodeAnalysis.API.Introspection do
     |> String.trim()
     |> String.split("\n\n")
     |> List.first()
+    |> String.replace("\n", " ")  # Collapse newlines within paragraph to single space
     |> String.split(". ")
     |> List.first()
     |> case do

@@ -54,8 +54,8 @@ defmodule Mix.Tasks.Api.Reference do
       app_name: config[:app],
       category_mappings: config[:api_category_mappings],
       output_file: config[:api_reference_output_file],
-      include_modulename_in_functions: true,
-      include_hidden_functions: true
+      include_modulename_in_functions: Keyword.get(config, :include_modulename_in_functions, true),
+      include_hidden_functions: Keyword.get(config, :include_hidden_functions, false)
     )
   end
 end

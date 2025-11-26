@@ -107,16 +107,16 @@ defmodule CodeAnalysis.Livebook.Extractor do
   @doc """
   Extracts module function calls from an Elixir AST.
 
-  Returns a MapSet of `{module, function}` tuples.
+  Returns a MapSet of `{module, function, arity}` tuples.
 
   ## Examples
 
       iex> {:ok, ast} = Code.string_to_quoted("Azure.EventHubs.send_event(conn, hub, event)")
       iex> CodeAnalysis.Livebook.Extractor.extract_calls(ast)
-      MapSet.new([{"Azure.EventHubs", "send_event"}])
+      MapSet.new([{"Azure.EventHubs", "send_event", 3}])
 
   """
-  @spec extract_calls(Macro.t()) :: MapSet.t({String.t(), String.t()})
+  @spec extract_calls(Macro.t()) :: MapSet.t({String.t(), String.t(), non_neg_integer()})
   def extract_calls(ast) do
     calls = MapSet.new()
 
@@ -126,16 +126,18 @@ defmodule CodeAnalysis.Livebook.Extractor do
         {:alias, _, _}, acc ->
           {nil, acc}
 
-        # Match Module.function(...) or Module.function
-        {{:., _, [{:__aliases__, _, module_parts}, function]}, _, _args}, acc
-        when is_atom(function) ->
+        # Match Module.function(...) or Module.function with args
+        {{:., _, [{:__aliases__, _, module_parts}, function]}, _, args}, acc
+        when is_atom(function) and is_list(args) ->
           module = Enum.join(module_parts, ".")
-          {nil, MapSet.put(acc, {module, to_string(function)})}
+          arity = length(args)
+          {nil, MapSet.put(acc, {module, to_string(function), arity})}
 
-        # Match Module.function in other contexts (not a call)
+        # Match Module.function in other contexts (not a call) - no arity
         {:., _, [{:__aliases__, _, module_parts}, function]}, acc when is_atom(function) ->
           module = Enum.join(module_parts, ".")
-          {nil, MapSet.put(acc, {module, to_string(function)})}
+          # No arity available for non-call contexts
+          {nil, MapSet.put(acc, {module, to_string(function), nil})}
 
         node, acc ->
           {node, acc}
