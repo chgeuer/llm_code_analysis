@@ -152,6 +152,13 @@ defmodule CodeAnalysis.Livebook.Extractor do
   Given a module name like "EventData" and a map of aliases,
   returns the full module name like "Azure.EventHubs.EventData".
 
+  If the aliases map contains a "__namespace__" key, it will be used
+  to resolve unqualified single-part module names by prefixing them
+  with the namespace (implementing Elixir's implicit aliasing).
+
+  However, standard Elixir modules (Enum, String, Map, etc.) are never
+  prefixed with the namespace.
+
   ## Examples
 
       iex> aliases = %{"EventData" => "Azure.EventHubs.EventData"}
@@ -160,6 +167,14 @@ defmodule CodeAnalysis.Livebook.Extractor do
 
       iex> CodeAnalysis.Livebook.Extractor.resolve_alias("UnknownModule", %{})
       "UnknownModule"
+      
+      iex> aliases = %{"__namespace__" => "Azure.EventHubs.Processor"}
+      iex> CodeAnalysis.Livebook.Extractor.resolve_alias("PartitionManager", aliases)
+      "Azure.EventHubs.Processor.PartitionManager"
+      
+      iex> aliases = %{"__namespace__" => "Azure.EventHubs.Processor"}
+      iex> CodeAnalysis.Livebook.Extractor.resolve_alias("Enum", aliases)
+      "Enum"
 
   """
   @spec resolve_alias(String.t(), %{String.t() => String.t()}) :: String.t()
@@ -169,7 +184,17 @@ defmodule CodeAnalysis.Livebook.Extractor do
 
     case Map.get(aliases, first_part) do
       nil ->
-        module
+        # No explicit alias found, check for implicit namespace aliasing
+        # If it's a single-part name and we have a namespace, try prefixing
+        # BUT: don't prefix standard library modules or modules that start with certain known prefixes
+        if length(parts) == 1 && should_apply_namespace?(module) do
+          case Map.get(aliases, "__namespace__") do
+            nil -> module
+            namespace -> "#{namespace}.#{module}"
+          end
+        else
+          module
+        end
 
       aliased_module ->
         remaining = Enum.drop(parts, 1)
@@ -180,5 +205,23 @@ defmodule CodeAnalysis.Livebook.Extractor do
           "#{aliased_module}.#{Enum.join(remaining, ".")}"
         end
     end
+  end
+
+  # Determines if a module name should have namespace prefix applied
+  # Standard library and common modules should not be prefixed
+  defp should_apply_namespace?(module) do
+    # List of modules that should never be prefixed with namespace
+    stdlib_modules = ~w[
+      Enum String Map List Kernel IO File System Process Logger Stream
+      Agent Task GenServer Supervisor Application Code Module Regex URI
+      Path DateTime NaiveDateTime Date Time Integer Float Keyword Exception
+      Range Mix MapSet Tuple Access Base Calendar Inspect Port Node
+      Protocol Record Set Version
+      Jason Req Kino ExUnit Broadway Flow SweetXml X509 Bandit Avrora
+      WebSockex NimbleOptions NimbleParsec Finch Mint
+    ]
+
+    # Don't apply namespace to standard library modules
+    module not in stdlib_modules
   end
 end

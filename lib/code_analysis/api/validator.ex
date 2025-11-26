@@ -118,6 +118,44 @@ defmodule CodeAnalysis.API.Validator do
 
   # Private functions
 
+  defp extract_module_namespace(ast) do
+    {_, namespace} =
+      Macro.prewalk(ast, nil, fn
+        {:defmodule, _, [{:__aliases__, _, module_parts}, _]}, _acc ->
+          # Extract the namespace from defmodule, excluding the last part
+          case module_parts do
+            [_single] ->
+              # No namespace for top-level modules
+              {nil, nil}
+
+            parts when is_list(parts) ->
+              # For nested modules like Azure.EventHubs.Processor.PartitionManagerTest
+              # The namespace is Azure.EventHubs.Processor
+              namespace_parts = Enum.drop(parts, -1)
+              namespace = Enum.join(namespace_parts, ".")
+              {nil, namespace}
+          end
+
+        node, acc ->
+          {node, acc}
+      end)
+
+    namespace
+  end
+
+  defp merge_implicit_aliases(explicit_aliases, nil), do: explicit_aliases
+
+  defp merge_implicit_aliases(explicit_aliases, namespace) do
+    # For a module in namespace "Azure.EventHubs.Processor",
+    # Elixir's implicit aliasing means that unqualified single-part names
+    # like "PartitionManager" resolve to "Azure.EventHubs.Processor.PartitionManager"
+    # 
+    # We store the namespace in the aliases map with a special key so that
+    # resolve_alias can apply it when needed.
+
+    Map.put(explicit_aliases, "__namespace__", namespace)
+  end
+
   defp find_files(patterns, exclude_patterns) do
     patterns
     |> Enum.flat_map(&Path.wildcard/1)
@@ -150,8 +188,14 @@ defmodule CodeAnalysis.API.Validator do
   end
 
   defp validate_ast(file_path, ast, allowed_modules) do
+    # Extract module namespace from defmodule
+    module_namespace = extract_module_namespace(ast)
+
     # Extract aliases from AST
-    aliases = Extractor.extract_aliases(ast)
+    explicit_aliases = Extractor.extract_aliases(ast)
+
+    # Combine explicit aliases with implicit aliases from module namespace
+    aliases = merge_implicit_aliases(explicit_aliases, module_namespace)
 
     # Extract all module function calls from AST
     calls = Extractor.extract_calls(ast)
@@ -170,23 +214,11 @@ defmodule CodeAnalysis.API.Validator do
       |> Enum.map(fn
         {module, function, arity} when is_integer(arity) ->
           resolved = Extractor.resolve_alias(module, aliases)
-          call = "#{module}.#{function}/#{arity}"
-
-          if module == resolved do
-            call
-          else
-            "#{call} (→ #{resolved}.#{function}/#{arity})"
-          end
+          "#{resolved}.#{function}/#{arity}"
 
         {module, function, nil} ->
           resolved = Extractor.resolve_alias(module, aliases)
-          call = "#{module}.#{function}"
-
-          if module == resolved do
-            call
-          else
-            "#{call} (→ #{resolved}.#{function})"
-          end
+          "#{resolved}.#{function}"
       end)
       |> Enum.sort()
 
@@ -194,8 +226,13 @@ defmodule CodeAnalysis.API.Validator do
       calls
       |> MapSet.to_list()
       |> Enum.map(fn
-        {mod, fun, arity} when is_integer(arity) -> "#{mod}.#{fun}/#{arity}"
-        {mod, fun, nil} -> "#{mod}.#{fun}"
+        {mod, fun, arity} when is_integer(arity) ->
+          resolved = Extractor.resolve_alias(mod, aliases)
+          "#{resolved}.#{fun}/#{arity}"
+
+        {mod, fun, nil} ->
+          resolved = Extractor.resolve_alias(mod, aliases)
+          "#{resolved}.#{fun}"
       end)
       |> Enum.sort()
 
@@ -296,7 +333,6 @@ defmodule CodeAnalysis.API.Validator do
     end
   end
 
-
   defp valid_call_string?(call, allowed_modules) do
     parts = String.split(call, ".")
     {module_parts, [function]} = Enum.split(parts, -1)
@@ -323,7 +359,6 @@ defmodule CodeAnalysis.API.Validator do
     ArgumentError ->
       false
   end
-
 
   defp allowed_module?(module, allowed_modules) do
     Enum.any?(allowed_modules, fn prefix ->

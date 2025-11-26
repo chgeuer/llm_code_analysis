@@ -234,6 +234,7 @@ defmodule CodeAnalysis.API.Introspection do
         # Function has defaults - we need to truncate parameters
         # Calculate how many parameters to show
         params_to_show = arity
+
         signature_string
         |> String.trim()
         |> extract_function_call_with_params(params_to_show)
@@ -340,7 +341,8 @@ defmodule CodeAnalysis.API.Introspection do
     |> String.trim()
     |> String.split("\n\n")
     |> List.first()
-    |> String.replace("\n", " ")  # Collapse newlines within paragraph to single space
+    # Collapse newlines within paragraph to single space
+    |> String.replace("\n", " ")
     |> String.split(". ")
     |> List.first()
     |> case do
