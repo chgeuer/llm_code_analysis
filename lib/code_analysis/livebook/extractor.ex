@@ -5,7 +5,7 @@ defmodule CodeAnalysis.Livebook.Extractor do
   Filters out non-executable code blocks marked with `force_markdown`.
   Provides AST-based analysis of aliases and function calls.
 
-  Note: The `extract_executable_code/1` function now delegates to the 
+  Note: The `extract_executable_code/1` function now delegates to the
   `NimbleLivebookMarkdownExtractor` library for robust parsing.
   """
 
@@ -167,11 +167,11 @@ defmodule CodeAnalysis.Livebook.Extractor do
 
       iex> CodeAnalysis.Livebook.Extractor.resolve_alias("UnknownModule", %{})
       "UnknownModule"
-      
+
       iex> aliases = %{"__namespace__" => "Azure.EventHubs.Processor"}
       iex> CodeAnalysis.Livebook.Extractor.resolve_alias("PartitionManager", aliases)
       "Azure.EventHubs.Processor.PartitionManager"
-      
+
       iex> aliases = %{"__namespace__" => "Azure.EventHubs.Processor"}
       iex> CodeAnalysis.Livebook.Extractor.resolve_alias("Enum", aliases)
       "Enum"

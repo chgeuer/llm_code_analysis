@@ -73,7 +73,7 @@ for file in $(git diff --cached --name-only | grep '.livemd$'); do
     echo "❌ Failed to extract $file"
     exit 1
   }
-  
+
   elixir /tmp/test.exs || {
     echo "❌ Extracted code from $file has errors"
     exit 1
@@ -203,22 +203,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      
+
       - name: Setup Elixir
         uses: erlef/setup-beam@v1
         with:
           elixir-version: '1.19'
           otp-version: '27'
-      
+
       - name: Install dependencies
         run: mix deps.get
-      
+
       - name: Compile
         run: mix compile
-      
+
       - name: Validate API calls
         run: mix api.validate
-      
+
       - name: Test LiveBooks
         run: |
           for file in $(find . -name "*.livemd" -not -path "./deps/*"); do

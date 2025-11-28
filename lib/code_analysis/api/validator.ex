@@ -120,14 +120,16 @@ defmodule CodeAnalysis.API.Validator do
 
   defp format_invalid_call(original_module, resolved_module, function, arity) do
     # If the module was not resolved (single name with no alias), indicate it's ambiguous
-    is_unresolved = original_module == resolved_module and not String.contains?(original_module, ".")
-    
-    base_call = if arity do
-      "#{resolved_module}.#{function}/#{arity}"
-    else
-      "#{resolved_module}.#{function}"
-    end
-    
+    is_unresolved =
+      original_module == resolved_module and not String.contains?(original_module, ".")
+
+    base_call =
+      if arity do
+        "#{resolved_module}.#{function}/#{arity}"
+      else
+        "#{resolved_module}.#{function}"
+      end
+
     if is_unresolved do
       # Add the helpful message for unresolved modules
       if arity do
@@ -178,7 +180,7 @@ defmodule CodeAnalysis.API.Validator do
       {:defmodule, _, [{:__aliases__, _, module_parts}, [do: body]]} ->
         # Current module name
         current_module = Enum.join(module_parts, ".")
-        
+
         # Full qualified name
         full_module_name =
           if Enum.empty?(parent_modules) do
@@ -186,10 +188,10 @@ defmodule CodeAnalysis.API.Validator do
           else
             Enum.join(parent_modules ++ [current_module], ".")
           end
-        
+
         # Recursively collect from body with updated parent stack
         nested_modules = collect_modules(body, parent_modules ++ [current_module])
-        
+
         # Include this module and all nested ones
         [full_module_name | nested_modules]
 
@@ -215,7 +217,7 @@ defmodule CodeAnalysis.API.Validator do
       # Also check if this is a short reference to a nested module
       # e.g., "TestConsumer" might be "ParentModule.TestConsumer"
       short_name = module_name |> String.split(".") |> List.last()
-      
+
       Enum.any?(defined_modules, fn defined_module ->
         defined_module == module_name || String.ends_with?(defined_module, ".#{short_name}")
       end)
@@ -228,7 +230,7 @@ defmodule CodeAnalysis.API.Validator do
     # For a module in namespace "Azure.EventHubs.Processor",
     # Elixir's implicit aliasing means that unqualified single-part names
     # like "PartitionManager" resolve to "Azure.EventHubs.Processor.PartitionManager"
-    # 
+    #
     # We store the namespace in the aliases map with a special key so that
     # resolve_alias can apply it when needed.
 
@@ -291,7 +293,7 @@ defmodule CodeAnalysis.API.Validator do
           # Check if function exists with ANY arity (not strict arity check)
           # because pipe operators and default parameters make arity complex
           resolved_module = Extractor.resolve_alias(module, aliases)
-          
+
           # Skip validation if the module is defined in this same file
           module_defined_in_file?(resolved_module, defined_modules) ||
             valid_call?(resolved_module, function, allowed_modules)
@@ -347,24 +349,27 @@ defmodule CodeAnalysis.API.Validator do
       end)
       |> Enum.map(fn call ->
         resolved = resolve_alias(call, aliases)
-        
+
         # Extract module and function from call string
         parts = String.split(call, ".")
         {module_parts, [_function]} = Enum.split(parts, -1)
         original_module = Enum.join(module_parts, ".")
-        
+
         resolved_parts = String.split(resolved, ".")
         {resolved_module_parts, [_resolved_function]} = Enum.split(resolved_parts, -1)
         resolved_module = Enum.join(resolved_module_parts, ".")
-        
+
         # Check if module is unresolved (short name with no alias)
-        is_unresolved = original_module == resolved_module and not String.contains?(original_module, ".")
-        
+        is_unresolved =
+          original_module == resolved_module and not String.contains?(original_module, ".")
+
         cond do
           is_unresolved ->
             "#{resolved} [unresolved module: '#{original_module}' - add explicit alias or use fully-qualified name]"
+
           call == resolved ->
             call
+
           true ->
             "#{call} (→ #{resolved})"
         end
@@ -448,16 +453,17 @@ defmodule CodeAnalysis.API.Validator do
       {:module, ^module} ->
         # Check if it's a protocol - protocols have __protocol__/1 function
         is_protocol = function_exported?(module, :__protocol__, 1)
-        
+
         if is_protocol do
           # For protocols, accept special functions like impl_for/1, impl_for!/1, etc.
           protocol_functions = ~w[impl_for impl_for!]
-          
+
           if function_name in protocol_functions do
             true
           else
             # Check regular exports
             exports = module.__info__(:functions)
+
             Enum.any?(exports, fn {name, _arity} ->
               Atom.to_string(name) == function_name
             end)
@@ -465,6 +471,7 @@ defmodule CodeAnalysis.API.Validator do
         else
           # Regular module - check exports
           exports = module.__info__(:functions)
+
           Enum.any?(exports, fn {name, _arity} ->
             Atom.to_string(name) == function_name
           end)

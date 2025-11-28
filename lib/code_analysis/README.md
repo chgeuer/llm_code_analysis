@@ -81,7 +81,7 @@ defp aliases do
     # Function alias - explicit configuration
     llm_api_reference: fn _args ->
       Mix.Task.run("compile")
-      
+
       CodeAnalysis.API.ReferenceGenerator.generate(
         app_name: :azure_amqp,
         category_mappings: api_category_mappings(),
@@ -90,10 +90,10 @@ defp aliases do
         include_hidden_functions: true
       )
     end,
-    
+
     validate_api_calls: fn _args ->
       Mix.Task.run("compile")
-      
+
       CodeAnalysis.API.Validator.validate(
         file_patterns: ["**/*.{exs,livemd}"],
         exclude_patterns: ["_build/", "deps/"],
@@ -153,7 +153,7 @@ def project do
       {~r/EventHubs/, "Event Hubs"},
       {true, "Other"}
     ],
-    
+
     # Define output file location
     api_reference_output_file: "docs/llm-api-reference.md"
   ]
@@ -275,7 +275,7 @@ defp aliases do
     # Function aliases for explicit configuration
     api_ref: fn _args ->
       Mix.Task.run("compile")
-      
+
       CodeAnalysis.API.ReferenceGenerator.generate(
         app_name: :my_app,
         category_mappings: [
@@ -286,16 +286,16 @@ defp aliases do
         output_file: "docs/api-reference.md"
       )
     end,
-    
+
     validate: fn _args ->
       Mix.Task.run("compile")
-      
+
       CodeAnalysis.API.Validator.validate(
         allowed_modules: ["MyApp.TestHelper"]
       )
       |> CodeAnalysis.API.Validator.print_summary()
     end,
-    
+
     extract: fn args ->
       Mix.Task.run("livebook.extract", args)
     end
