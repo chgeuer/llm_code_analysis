@@ -118,6 +118,29 @@ defmodule CodeAnalysis.API.Validator do
 
   # Private functions
 
+  defp format_invalid_call(original_module, resolved_module, function, arity) do
+    # If the module was not resolved (single name with no alias), indicate it's ambiguous
+    is_unresolved = original_module == resolved_module and not String.contains?(original_module, ".")
+    
+    base_call = if arity do
+      "#{resolved_module}.#{function}/#{arity}"
+    else
+      "#{resolved_module}.#{function}"
+    end
+    
+    if is_unresolved do
+      # Add the helpful message for unresolved modules
+      if arity do
+        "#{base_call} [unresolved module: '#{original_module}' - add explicit alias or use fully-qualified name]"
+      else
+        # When arity is unknown, we still want the helpful message
+        "#{base_call} [unresolved module: '#{original_module}' - add explicit alias or use fully-qualified name]"
+      end
+    else
+      base_call
+    end
+  end
+
   defp extract_module_namespace(ast) do
     {_, namespace} =
       Macro.prewalk(ast, nil, fn
@@ -276,11 +299,11 @@ defmodule CodeAnalysis.API.Validator do
       |> Enum.map(fn
         {module, function, arity} when is_integer(arity) ->
           resolved = Extractor.resolve_alias(module, aliases)
-          "#{resolved}.#{function}/#{arity}"
+          format_invalid_call(module, resolved, function, arity)
 
         {module, function, nil} ->
           resolved = Extractor.resolve_alias(module, aliases)
-          "#{resolved}.#{function}"
+          format_invalid_call(module, resolved, function, nil)
       end)
       |> Enum.sort()
 
@@ -324,11 +347,26 @@ defmodule CodeAnalysis.API.Validator do
       end)
       |> Enum.map(fn call ->
         resolved = resolve_alias(call, aliases)
-
-        if call == resolved do
-          call
-        else
-          "#{call} (→ #{resolved})"
+        
+        # Extract module and function from call string
+        parts = String.split(call, ".")
+        {module_parts, [_function]} = Enum.split(parts, -1)
+        original_module = Enum.join(module_parts, ".")
+        
+        resolved_parts = String.split(resolved, ".")
+        {resolved_module_parts, [_resolved_function]} = Enum.split(resolved_parts, -1)
+        resolved_module = Enum.join(resolved_module_parts, ".")
+        
+        # Check if module is unresolved (short name with no alias)
+        is_unresolved = original_module == resolved_module and not String.contains?(original_module, ".")
+        
+        cond do
+          is_unresolved ->
+            "#{resolved} [unresolved module: '#{original_module}' - add explicit alias or use fully-qualified name]"
+          call == resolved ->
+            call
+          true ->
+            "#{call} (→ #{resolved})"
         end
       end)
 
