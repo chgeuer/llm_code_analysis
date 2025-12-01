@@ -212,11 +212,13 @@ defmodule CodeAnalysis.Livebook.Extractor do
   defp should_apply_namespace?(module) do
     # List of modules that should never be prefixed with namespace
     stdlib_modules = ~w[
-      Enum Enumerable String Map List Kernel IO File System Process Logger Stream
-      Agent Task GenServer Supervisor Application Code Module Regex URI
-      Path DateTime NaiveDateTime Date Time Integer Float Keyword Exception
-      Range Mix MapSet Tuple Access Base Calendar Inspect Port Node
-      Protocol Record Set Version Collectable
+      Access Agent Application Atom Base Behaviour Bitwise Calendar
+      Code Collectable Date DateTime DynamicSupervisor Enum Enumerable
+      Exception File Float Function GenServer Inspect Integer IO
+      Kernel Keyword List Logger Macro Map MapSet Mix Module NaiveDateTime
+      Node OptionParser PartitionSupervisor Path Port Process Protocol
+      Range Record Regex Registry Set Stream String StringIO Supervisor
+      System Task Time Tuple URI Version
       Jason Req Kino ExUnit Broadway Flow SweetXml X509 Bandit Avrora
       WebSockex NimbleOptions NimbleParsec Finch Mint
     ]
